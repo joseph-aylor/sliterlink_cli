@@ -196,7 +196,6 @@ fn removal_priority(cell: Cell, width: usize, height: usize, difficulty: Difficu
 fn should_preserve(cell: Cell, width: usize, height: usize, difficulty: Difficulty) -> bool {
     let is_corner = (cell.x == 0 || cell.x == width - 1)
         && (cell.y == 0 || cell.y == height - 1);
-    let is_edge = cell.x == 0 || cell.x == width - 1 || cell.y == 0 || cell.y == height - 1;
 
     // Easy mode strongly preserves certain positions
     match difficulty {

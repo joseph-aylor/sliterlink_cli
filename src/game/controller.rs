@@ -255,17 +255,17 @@ where
             }
 
             GameInput::DrawLine(direction) => {
-                // Toggle line on edge in that direction
                 if let Some(edge) = self.state.cursor_edge(direction) {
                     self.state.toggle_line(edge);
                 }
+                self.state.move_cursor(direction);
             }
 
             GameInput::DrawCross(direction) => {
-                // Toggle cross on edge in that direction
                 if let Some(edge) = self.state.cursor_edge(direction) {
                     self.state.toggle_cross(edge);
                 }
+                self.state.move_cursor(direction);
             }
 
             GameInput::Quit => {
@@ -341,18 +341,11 @@ mod tests {
     fn winning_inputs() -> ScriptedInputHandler {
         let mut input = ScriptedInputHandler::new();
 
-        // Draw all 4 edges from starting position (0,0)
-        input.queue(GameInput::DrawLine(Direction::Right)); // top edge
-        input.queue(GameInput::DrawLine(Direction::Down)); // left edge
-
-        // Move to (1,0) and draw right edge
-        input.queue(GameInput::Move(Direction::Right));
-        input.queue(GameInput::DrawLine(Direction::Down)); // right edge
-
-        // Move to (0,1) and draw bottom edge
-        input.queue(GameInput::Move(Direction::Down));
-        input.queue(GameInput::Move(Direction::Left));
-        input.queue(GameInput::DrawLine(Direction::Right)); // bottom edge
+        // Start at (0,0)
+        input.queue(GameInput::DrawLine(Direction::Right)); // top edge; cursor -> (1,0)
+        input.queue(GameInput::DrawLine(Direction::Down));  // right edge; cursor -> (1,1)
+        input.queue(GameInput::DrawLine(Direction::Left));  // bottom edge; cursor -> (0,1)
+        input.queue(GameInput::DrawLine(Direction::Up));    // left edge; cursor -> (0,0)
 
         input
     }
@@ -427,14 +420,15 @@ mod tests {
 
         let mut controller = GameController::new(state, renderer, input);
 
-        // Draw line to the right
+        // Draw line to the right - cursor moves to (1,0)
         controller.handle_input(GameInput::DrawLine(Direction::Right));
 
         let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
         assert_eq!(controller.state().edge_state(edge), EdgeState::Line);
+        assert_eq!(controller.state().cursor(), Vertex::new(1, 0));
 
-        // Toggle it off
-        controller.handle_input(GameInput::DrawLine(Direction::Right));
+        // Toggle it off from (1,0) going Left - cursor moves back to (0,0)
+        controller.handle_input(GameInput::DrawLine(Direction::Left));
         assert_eq!(controller.state().edge_state(edge), EdgeState::Unknown);
     }
 
@@ -447,11 +441,12 @@ mod tests {
 
         let mut controller = GameController::new(state, renderer, input);
 
-        // Draw cross to the right
+        // Draw cross to the right - cursor moves to (1,0)
         controller.handle_input(GameInput::DrawCross(Direction::Right));
 
         let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
         assert_eq!(controller.state().edge_state(edge), EdgeState::Cross);
+        assert_eq!(controller.state().cursor(), Vertex::new(1, 0));
     }
 
     #[test]

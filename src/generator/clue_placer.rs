@@ -32,7 +32,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::core::grid::{Cell, Edge, Vertex};
+use crate::core::grid::{Cell, Edge};
 
 /// Derives clue values from a completed loop.
 ///
@@ -182,6 +182,7 @@ pub fn clue_statistics(clues: &HashMap<Cell, u8>) -> (usize, usize, usize, usize
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::grid::Vertex;
 
     /// Creates a simple 1x1 loop (a square).
     fn make_simple_square_loop() -> HashSet<Edge> {

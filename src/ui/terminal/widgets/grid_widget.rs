@@ -46,7 +46,7 @@ use ratatui::{
 };
 
 use crate::core::game_state::GameState;
-use crate::core::grid::{Cell, Direction, Edge, EdgeState, Vertex};
+use crate::core::grid::{Cell, Edge, EdgeState, Vertex};
 
 // =============================================================================
 // Character Constants

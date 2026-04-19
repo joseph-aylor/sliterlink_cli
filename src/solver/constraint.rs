@@ -38,7 +38,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::core::grid::{Cell, Direction, Edge, EdgeState, Vertex};
+use crate::core::grid::{Cell, Edge, EdgeState, Vertex};
 use crate::core::puzzle::Puzzle;
 
 // =============================================================================
@@ -319,13 +319,12 @@ impl SolverState {
 
         // Count current state
         let mut line_count = 0u8;
-        let mut cross_count = 0u8;
         let mut unknown_edges = Vec::new();
 
         for edge in edges {
             match self.get_edge(edge) {
                 EdgeState::Line => line_count += 1,
-                EdgeState::Cross => cross_count += 1,
+                EdgeState::Cross => {} // Counted implicitly via unknown_edges
                 EdgeState::Unknown => unknown_edges.push(edge),
             }
         }

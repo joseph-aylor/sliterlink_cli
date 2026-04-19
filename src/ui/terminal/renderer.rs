@@ -122,6 +122,7 @@ impl TerminalRenderer {
     /// * `title` - Dialog title
     /// * `message` - Dialog message content
     /// * `area` - Area to center the popup in
+    #[allow(dead_code)] // May be used for quit confirmation dialogs
     fn draw_popup(&self, frame: &mut Frame, title: &str, message: &str, area: Rect) {
         // Calculate centered popup area (40% width, 30% height)
         let popup_area = centered_rect(50, 30, area);

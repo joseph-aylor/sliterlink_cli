@@ -31,7 +31,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::core::game_state::GameState;
-use crate::core::grid::{Cell, Edge, EdgeState, Vertex};
+use crate::core::grid::{Cell, Edge, Vertex};
 use crate::core::puzzle::Puzzle;
 
 // =============================================================================
@@ -125,7 +125,7 @@ impl WinChecker {
     /// - Every vertex with lines has exactly 2 line edges (degree 2)
     /// - All line edges are connected (single component)
     /// - There's at least one line edge
-    fn check_loop_validity(&self, state: &GameState, puzzle: &Puzzle) -> bool {
+    fn check_loop_validity(&self, state: &GameState, _puzzle: &Puzzle) -> bool {
         // Collect all line edges
         let line_edges: Vec<Edge> = state.line_edges().collect();
 
@@ -354,6 +354,7 @@ impl std::fmt::Display for ValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::grid::EdgeState;
     use std::collections::HashMap as StdHashMap;
 
     /// Creates a 2x2 puzzle with a simple square loop solution.
