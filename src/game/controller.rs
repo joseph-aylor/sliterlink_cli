@@ -85,11 +85,12 @@ pub enum GameResult {
 ///
 /// # RUST CONCEPT: Generic Type Parameters with Trait Bounds
 ///
-/// ```rust
+/// ```ignore
 /// pub struct GameController<R, I>
 /// where
 ///     R: Renderer,
 ///     I: InputHandler,
+/// { /* ... */ }
 /// ```
 ///
 /// This syntax means:

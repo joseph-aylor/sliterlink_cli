@@ -143,8 +143,8 @@ impl Vertex {
     /// The `const` keyword makes this function callable at compile time.
     /// This means you can use it in const contexts:
     ///
-    /// ```rust
-    /// const ORIGIN: Vertex = Vertex::new(0, 0);
+    /// ```
+    /// const ORIGIN: slitherlink::core::grid::Vertex = slitherlink::core::grid::Vertex::new(0, 0);
     /// ```
     ///
     /// Compile-time evaluation is limited (no heap allocation, limited control flow),

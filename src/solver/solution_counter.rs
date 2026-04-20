@@ -269,7 +269,7 @@ impl Default for SolutionCounter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::grid::{Cell, Edge, Vertex};
+    use crate::core::grid::Cell;
     use std::collections::HashMap;
 
     /// Creates a 1x1 puzzle with clue 4 (forces all edges to be lines).
@@ -278,18 +278,6 @@ mod tests {
     fn make_trivial_unique_puzzle() -> Puzzle {
         let mut clues = HashMap::new();
         clues.insert(Cell::new(0, 0), 4);
-        Puzzle::new(1, 1, clues)
-    }
-
-    /// Creates a 1x1 puzzle with clue 0 (forces all edges to be crosses).
-    ///
-    /// This puzzle has exactly one solution: no loop at all.
-    /// Wait - that's not valid because there's no loop!
-    /// Actually, for a clue-0 only puzzle, there's no valid solution
-    /// (need at least some lines to form a loop).
-    fn make_empty_loop_puzzle() -> Puzzle {
-        let mut clues = HashMap::new();
-        clues.insert(Cell::new(0, 0), 0);
         Puzzle::new(1, 1, clues)
     }
 

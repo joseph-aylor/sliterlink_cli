@@ -139,11 +139,15 @@ impl LoopBuilder {
     ///
     /// Uses an iterative approach with explicit backtracking stack
     /// rather than recursion to avoid stack overflow on large grids.
+    ///
+    /// Invariant: `untried_moves.len() == path.len() + 1` at all times.
+    /// `untried_moves[i]` holds the moves not yet tried from the vertex
+    /// at the start of path step `i`. The +1 entry covers the current
+    /// position before any step is taken. This ensures backtracking never
+    /// re-offers a move that has already been tried.
     fn try_generate_loop<R: Rng>(&self, rng: &mut R) -> Option<HashSet<Edge>> {
-        // Pick a random starting vertex (prefer interior for better loops)
         let start = self.random_start_vertex(rng);
 
-        // State tracking
         let mut path: Vec<Edge> = Vec::new();
         let mut visited: HashSet<Vertex> = HashSet::new();
         let mut vertex_degree: HashMap<Vertex, usize> = HashMap::new();
@@ -151,73 +155,67 @@ impl LoopBuilder {
 
         visited.insert(start);
 
-        // Track which moves we've tried at each position for backtracking
-        // Each entry is the list of untried directions from that point
+        // Precompute and push the initial moves from start.
         let mut untried_moves: Vec<Vec<(Vertex, Edge)>> = Vec::new();
+        let mut initial = self
+            .get_valid_moves(current, start, &visited, &vertex_degree, 0)
+            .into_iter()
+            .filter(|(v, _)| *v != start)
+            .collect::<Vec<_>>();
+        initial.shuffle(rng);
+        untried_moves.push(initial);
 
         loop {
-            // Get valid moves from current position
-            let moves = self.get_valid_moves(current, start, &visited, &vertex_degree, path.len());
-
-            // Check if we can close the loop
+            // Check if we can close the loop from the current position.
             if path.len() >= self.min_path_length {
-                if let Some((_, closing_edge)) = moves.iter().find(|(v, _)| *v == start) {
-                    // Found a way to close the loop!
-                    path.push(*closing_edge);
+                let all = self.get_valid_moves(current, start, &visited, &vertex_degree, path.len());
+                if let Some((_, closing_edge)) = all.into_iter().find(|(v, _)| *v == start) {
+                    path.push(closing_edge);
                     return Some(path.into_iter().collect());
                 }
             }
 
-            // Filter out the start vertex for regular moves (can only go there to close)
-            let mut regular_moves: Vec<_> = moves
-                .into_iter()
-                .filter(|(v, _)| *v != start)
-                .collect();
-
-            if regular_moves.is_empty() {
-                // No valid moves - need to backtrack
-                if path.is_empty() {
-                    // Completely stuck at start, give up this attempt
-                    return None;
-                }
-
-                // Backtrack: remove last edge and restore state
-                let last_edge = path.pop().unwrap();
-                untried_moves.pop();
-
-                // Find where we came from
-                let prev = if last_edge.from() == current {
-                    last_edge.to()
-                } else {
-                    last_edge.from()
-                };
-
-                // Restore state
-                *vertex_degree.entry(current).or_default() -= 1;
-                *vertex_degree.entry(prev).or_default() -= 1;
-                visited.remove(&current);
-                current = prev;
-
-                continue;
-            }
-
-            // Shuffle for randomness
-            regular_moves.shuffle(rng);
-
-            // Take the first move, save the rest for backtracking
-            let (next_vertex, edge) = regular_moves.remove(0);
-            untried_moves.push(regular_moves);
-
-            // Update state
-            path.push(edge);
-            *vertex_degree.entry(current).or_default() += 1;
-            *vertex_degree.entry(next_vertex).or_default() += 1;
-            visited.insert(next_vertex);
-            current = next_vertex;
-
-            // Safety limit: prevent infinite loops
+            // Safety limit.
             if path.len() > (self.width + 1) * (self.height + 1) * 2 {
                 return None;
+            }
+
+            // Take the next untried move for the current position.
+            match untried_moves.last_mut().and_then(|m| m.pop()) {
+                Some((next_vertex, edge)) => {
+                    // Advance to next_vertex.
+                    *vertex_degree.entry(current).or_default() += 1;
+                    *vertex_degree.entry(next_vertex).or_default() += 1;
+                    visited.insert(next_vertex);
+                    path.push(edge);
+                    current = next_vertex;
+
+                    // Compute and push moves for the new position.
+                    let mut moves = self
+                        .get_valid_moves(current, start, &visited, &vertex_degree, path.len())
+                        .into_iter()
+                        .filter(|(v, _)| *v != start)
+                        .collect::<Vec<_>>();
+                    moves.shuffle(rng);
+                    untried_moves.push(moves);
+                }
+                None => {
+                    // Current position exhausted — backtrack.
+                    untried_moves.pop(); // discard the empty list
+
+                    if path.is_empty() {
+                        return None; // All options from start tried, give up.
+                    }
+
+                    let last_edge = path.pop().unwrap();
+                    let (va, vb) = (last_edge.from(), last_edge.to());
+                    let prev = if va == current { vb } else { va };
+
+                    *vertex_degree.entry(current).or_default() -= 1;
+                    *vertex_degree.entry(prev).or_default() -= 1;
+                    visited.remove(&current);
+                    current = prev;
+                }
             }
         }
     }
@@ -389,7 +387,7 @@ mod tests {
     }
 
     /// Verifies that a set of edges forms a valid closed loop.
-    fn verify_valid_loop(edges: &HashSet<Edge>, width: usize, height: usize) -> bool {
+    fn verify_valid_loop(edges: &HashSet<Edge>, _width: usize, _height: usize) -> bool {
         if edges.is_empty() {
             return false;
         }

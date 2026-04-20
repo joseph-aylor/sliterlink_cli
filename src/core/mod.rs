@@ -32,7 +32,7 @@
 //!
 //! We re-export commonly used types at the module level for convenience:
 //!
-//! ```rust
+//! ```ignore
 //! // Instead of:
 //! use slitherlink::core::grid::{Vertex, Edge, Direction};
 //!

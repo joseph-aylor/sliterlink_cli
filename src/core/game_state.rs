@@ -112,13 +112,13 @@ pub enum GamePhase {
 /// # RUST CONCEPT: Clone vs Move
 ///
 /// When you create a GameState:
-/// ```rust
+/// ```ignore
 /// let state = GameState::new(puzzle);
 /// ```
 /// The `puzzle` is **moved** into `GameState`. You can no longer use `puzzle`.
 ///
 /// If you need to keep the original:
-/// ```rust
+/// ```ignore
 /// let state = GameState::new(puzzle.clone());
 /// ```
 /// This creates a deep copy of the puzzle.

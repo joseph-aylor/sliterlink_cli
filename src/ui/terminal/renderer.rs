@@ -61,7 +61,7 @@ use crate::ui::traits::Renderer;
 /// # RUST CONCEPT: Type Aliases
 ///
 /// `CrosstermBackend<Stdout>` is a long type. We could create a type alias:
-/// ```rust
+/// ```ignore
 /// type Term = Terminal<CrosstermBackend<Stdout>>;
 /// ```
 /// But here we use the full type for clarity.
@@ -204,7 +204,7 @@ impl Renderer for TerminalRenderer {
                 Span::styled("Ctrl+dir", Style::default().fg(Color::Green)),
                 Span::raw(" | "),
                 Span::styled("X: ", Style::default().fg(Color::Gray)),
-                Span::styled("Shift+dir", Style::default().fg(Color::Red)),
+                Span::styled("Shift+dir", Style::default().fg(Color::White)),
                 Span::raw(" | "),
                 Span::styled("Quit: ", Style::default().fg(Color::Gray)),
                 Span::styled("q", Style::default().fg(Color::Magenta)),

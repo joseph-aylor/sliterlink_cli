@@ -46,7 +46,7 @@ use crate::game::input::GameInput;
 /// A trait defines a set of methods that implementors must provide.
 /// Think of it as an interface in Java or a protocol in Swift.
 ///
-/// ```rust
+/// ```ignore
 /// pub trait Renderer {
 ///     fn render(&mut self, state: &GameState) -> io::Result<()>;
 ///     // ... other methods
@@ -252,7 +252,6 @@ impl<T: Renderer + InputHandler> GameUI for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::puzzle::Puzzle;
 
     // Test that we can use traits as bounds
     fn _accepts_renderer<R: Renderer>(_r: R) {}

@@ -37,18 +37,22 @@
 //! - **RNG seeding**: Reproducible randomness with ChaCha8Rng
 //! - **Graceful shutdown**: Cleaning up terminal state on exit/panic
 
+use std::collections::HashMap;
 use std::panic;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use rusqlite::{Connection, params};
 
 // Import from the library crate
 use slitherlink::cli::Args;
+use slitherlink::core::grid::Cell;
+use slitherlink::core::puzzle::Puzzle;
 use slitherlink::core::GameState;
 use slitherlink::game::{GameController, GameResult};
-use slitherlink::generator::PuzzleGenerator;
+use slitherlink::generator::{Difficulty, PuzzleGenerator};
 use slitherlink::ui::terminal::{TerminalInputHandler, TerminalRenderer};
 
 // =============================================================================
@@ -135,20 +139,45 @@ fn main() -> Result<()> {
     let rng = ChaCha8Rng::seed_from_u64(seed);
 
     // -------------------------------------------------------------------------
-    // Generate the puzzle
+    // Acquire the puzzle (from DB cache or by generating)
     // -------------------------------------------------------------------------
 
-    println!("Generating {} puzzle...", args.description());
-    println!("(Seed: {} - use this to replay the same puzzle)", seed);
+    let puzzle = if let Some(db_path) = &args.database {
+        let conn = open_db(db_path).context("Failed to open puzzle database")?;
+        let diff_str = difficulty_str(args.difficulty);
 
-    let mut generator = PuzzleGenerator::new(rng, args.difficulty);
+        if let Some(serialized) =
+            load_random_puzzle(&conn, args.width, args.height, diff_str)
+                .context("Failed to query puzzle database")?
+        {
+            println!("Loaded puzzle from database '{}'.", db_path);
+            println!("Starting game...\n");
+            deserialize_puzzle(&serialized, args.width, args.height)
+        } else {
+            println!("No matching puzzle in database — generating one...");
+            let mut generator = PuzzleGenerator::new(rng, args.difficulty);
+            let puzzle = generator
+                .generate(args.width, args.height)
+                .context("Failed to generate puzzle")?;
 
-    let puzzle = generator
-        .generate(args.width, args.height)
-        .context("Failed to generate puzzle")?;
-
-    println!("Generated puzzle with {} clues.", puzzle.clue_count());
-    println!("Starting game...\n");
+            let serialized = serialize_puzzle(&puzzle, args.width, args.height);
+            save_puzzle(&conn, args.width, args.height, diff_str, &serialized)
+                .context("Failed to save puzzle to database")?;
+            println!("Saved new puzzle to database '{}'.", db_path);
+            println!("Starting game...\n");
+            puzzle
+        }
+    } else {
+        println!("Generating {} puzzle...", args.description());
+        println!("(Seed: {} - use this to replay the same puzzle)", seed);
+        let mut generator = PuzzleGenerator::new(rng, args.difficulty);
+        let puzzle = generator
+            .generate(args.width, args.height)
+            .context("Failed to generate puzzle")?;
+        println!("Generated puzzle with {} clues.", puzzle.clue_count());
+        println!("Starting game...\n");
+        puzzle
+    };
 
     // -------------------------------------------------------------------------
     // Initialize game components
@@ -193,6 +222,89 @@ fn main() -> Result<()> {
 }
 
 // =============================================================================
+// Puzzle Database Helpers
+// =============================================================================
+
+fn difficulty_str(d: Difficulty) -> &'static str {
+    match d {
+        Difficulty::Easy => "easy",
+        Difficulty::Medium => "medium",
+        Difficulty::Hard => "hard",
+    }
+}
+
+fn open_db(path: &str) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS puzzles (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            width      INTEGER NOT NULL,
+            height     INTEGER NOT NULL,
+            difficulty TEXT    NOT NULL,
+            puzzle     TEXT    NOT NULL,
+            UNIQUE(width, height, difficulty, puzzle)
+        );
+        CREATE INDEX IF NOT EXISTS idx_puzzles_lookup
+            ON puzzles(width, height, difficulty);",
+    )?;
+    Ok(conn)
+}
+
+fn load_random_puzzle(
+    conn: &Connection,
+    width: usize,
+    height: usize,
+    difficulty: &str,
+) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT puzzle FROM puzzles \
+         WHERE width = ?1 AND height = ?2 AND difficulty = ?3 \
+         ORDER BY RANDOM() LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![width as i64, height as i64, difficulty])?;
+    Ok(rows.next()?.map(|row| row.get::<_, String>(0)).transpose()?)
+}
+
+fn save_puzzle(
+    conn: &Connection,
+    width: usize,
+    height: usize,
+    difficulty: &str,
+    puzzle: &str,
+) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO puzzles (width, height, difficulty, puzzle) \
+         VALUES (?1, ?2, ?3, ?4)",
+        params![width as i64, height as i64, difficulty, puzzle],
+    )?;
+    Ok(())
+}
+
+fn serialize_puzzle(puzzle: &Puzzle, width: usize, height: usize) -> String {
+    let mut s = String::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            match puzzle.clue(Cell::new(x, y)) {
+                Some(n) => s.push(char::from_digit(n as u32, 10).unwrap()),
+                None => s.push('.'),
+            }
+        }
+    }
+    s
+}
+
+fn deserialize_puzzle(s: &str, width: usize, height: usize) -> Puzzle {
+    let mut clues = HashMap::new();
+    for (i, c) in s.chars().enumerate() {
+        if c != '.' {
+            let clue = c.to_digit(10).unwrap() as u8;
+            clues.insert(Cell::new(i % width, i / width), clue);
+        }
+    }
+    Puzzle::new(width, height, clues)
+}
+
+// =============================================================================
 // Additional Entry Points (for testing CLI without full game)
 // =============================================================================
 
@@ -211,6 +323,7 @@ mod tests {
             height: 5,
             difficulty: slitherlink::generator::Difficulty::Medium,
             seed: None,
+            database: None,
         };
 
         assert_eq!(args.width, 5);

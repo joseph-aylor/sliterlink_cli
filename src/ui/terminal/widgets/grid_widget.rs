@@ -139,7 +139,7 @@ impl<'a> GridWidget<'a> {
             state,
             vertex_style: Style::default().fg(Color::White),
             line_style: Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-            cross_style: Style::default().fg(Color::Red),
+            cross_style: Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
             clue_style: Style::default().fg(Color::Cyan),
             cursor_style: Style::default()
                 .fg(Color::Yellow)
@@ -206,7 +206,7 @@ impl<'a> GridWidget<'a> {
 
         let (symbol, style) = match state {
             EdgeState::Line => (H_LINE, self.line_style),
-            EdgeState::Cross => ("─×─", self.cross_style),
+            EdgeState::Cross => (" × ", self.cross_style),
             EdgeState::Unknown => (H_UNKNOWN, Style::default()),
         };
 
@@ -258,8 +258,8 @@ impl<'a> GridWidget<'a> {
                 // Satisfied - green
                 Style::default().fg(Color::Green)
             } else if line_count > clue as usize {
-                // Too many - red
-                Style::default().fg(Color::Red)
+                // Too many - magenta bold
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
             } else {
                 // Not yet satisfied - normal
                 self.clue_style

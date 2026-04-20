@@ -154,6 +154,14 @@ pub struct Args {
         help = "Random seed for reproducible puzzles"
     )]
     pub seed: Option<u64>,
+
+    /// Path to a SQLite puzzle database.
+    ///
+    /// When provided:
+    /// - A random matching puzzle is loaded from the database if one exists.
+    /// - If no match is found, a new puzzle is generated and saved for next time.
+    #[arg(long, help = "SQLite database for puzzle caching")]
+    pub database: Option<String>,
 }
 
 impl Args {
@@ -221,6 +229,7 @@ mod tests {
             height: 5,
             difficulty: Difficulty::Medium,
             seed: None,
+            database: None,
         };
 
         assert_eq!(args.width, 5);
@@ -236,6 +245,7 @@ mod tests {
             height: 15,
             difficulty: Difficulty::Medium,
             seed: None,
+            database: None,
         };
 
         let warnings = args.validate();
@@ -250,6 +260,7 @@ mod tests {
             height: 2,
             difficulty: Difficulty::Easy,
             seed: None,
+            database: None,
         };
 
         let warnings = args.validate();
@@ -264,6 +275,7 @@ mod tests {
             height: 5,
             difficulty: Difficulty::Medium,
             seed: None,
+            database: None,
         };
 
         let warnings = args.validate();
@@ -277,6 +289,7 @@ mod tests {
             height: 5,
             difficulty: Difficulty::Hard,
             seed: Some(42),
+            database: None,
         };
 
         let desc = args.description();
@@ -292,6 +305,7 @@ mod tests {
             height: 7,
             difficulty: Difficulty::Easy,
             seed: None,
+            database: None,
         };
 
         let desc = args.description();
