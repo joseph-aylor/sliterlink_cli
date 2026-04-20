@@ -1,0 +1,234 @@
+# =============================================================================
+# Cargo.toml - Package Manifest for Slitherlink Puzzle Game
+# =============================================================================
+#
+# This file defines the Rust package configuration, dependencies, and metadata.
+#
+# RUST CONCEPT: Cargo.toml
+# -------------------------
+# Cargo is Rust's build system and package manager. This TOML file tells Cargo:
+# - Package metadata (name, version, authors)
+# - Dependencies (external crates/libraries)
+# - Build configuration (edition, features)
+#
+# The `[package]` section defines metadata about this crate (Rust's term for
+# a package/library). The `[dependencies]` section lists external crates
+# we depend on, which Cargo will download from crates.io.
+
+[package]
+# The name of this crate - used when publishing or as a dependency
+name = "slitherlink"
+
+# Semantic versioning: MAJOR.MINOR.PATCH
+# - MAJOR: Breaking API changes
+# - MINOR: New features, backwards compatible
+# - PATCH: Bug fixes, backwards compatible
+version = "0.1.0"
+
+# Rust edition to use. Editions are how Rust makes breaking changes
+# without breaking existing code. Code is opted into an edition.
+# - 2015: Original edition
+# - 2018: Added async/await, module changes
+# - 2021: Latest stable, various improvements
+# - 2024: Newest (we use this for latest features)
+edition = "2024"
+
+# Package description for crates.io and documentation
+description = "A terminal-based Slitherlink puzzle game with auto-generated, uniquely solvable puzzles"
+
+# SPDX license identifier
+license = "MIT"
+
+# Author information
+authors = ["Slitherlink Game Developer"]
+
+# Categories for crates.io
+categories = ["games", "command-line-utilities"]
+
+# Keywords for searchability
+keywords = ["slitherlink", "puzzle", "terminal", "game", "tui"]
+
+# README file path
+readme = "README.md"
+
+# Repository URL
+repository = "https://github.com/example/slitherlink"
+
+# =============================================================================
+# Dependencies
+# =============================================================================
+#
+# RUST CONCEPT: Semantic Versioning in Dependencies
+# --------------------------------------------------
+# - "0.28" means ">=0.28.0 and <0.29.0" (compatible updates)
+# - "=1.0.0" means exactly that version
+# - "~1.0" means ">=1.0.0 and <1.1.0" (patch updates only)
+# - Features can be enabled with `features = ["..."]`
+
+[dependencies]
+# -----------------------------------------------------------------------------
+# Ratatui - Terminal User Interface Library
+# -----------------------------------------------------------------------------
+# Ratatui (a fork/continuation of tui-rs) provides widgets and layout system
+# for building terminal UIs. It uses "immediate mode" rendering where we
+# redraw the entire UI each frame based on current state.
+#
+# Key concepts:
+# - Widgets: Reusable UI components (Paragraph, Block, List, etc.)
+# - Layout: Constraint-based layout system (like CSS flexbox)
+# - Frame: Represents one frame of rendering
+# - Backend: Abstraction over terminal libraries (we use crossterm)
+ratatui = "0.29"
+
+# -----------------------------------------------------------------------------
+# Crossterm - Cross-platform Terminal Manipulation
+# -----------------------------------------------------------------------------
+# Crossterm provides low-level terminal control:
+# - Raw mode: Direct character input without line buffering
+# - Alternate screen: Separate buffer that doesn't pollute history
+# - Event handling: Keyboard, mouse, resize events
+# - Styling: Colors, bold, underline, etc.
+#
+# Works on Windows, macOS, and Linux without platform-specific code.
+crossterm = "0.28"
+
+# -----------------------------------------------------------------------------
+# Clap - Command Line Argument Parser
+# -----------------------------------------------------------------------------
+# Clap (Command Line Argument Parser) handles CLI argument parsing.
+# The "derive" feature enables using Rust derive macros to define arguments
+# declaratively on structs, rather than imperatively.
+#
+# Example:
+# ```rust
+# #[derive(Parser)]
+# struct Args {
+#     #[arg(short, long)]
+#     width: usize,
+# }
+# ```
+#
+# This generates all parsing logic at compile time - no runtime overhead!
+clap = { version = "4.5", features = ["derive"] }
+
+# -----------------------------------------------------------------------------
+# Random Number Generation
+# -----------------------------------------------------------------------------
+# `rand` is the de facto standard for random number generation in Rust.
+# It provides:
+# - RNG traits (Rng, SeedableRng)
+# - Distributions (uniform, normal, etc.)
+# - Random sampling from collections
+rand = "0.8"
+
+# `rand_chacha` provides the ChaCha cryptographic RNG, which is:
+# - Seedable: Same seed = same sequence (reproducible puzzles!)
+# - Fast: Uses ChaCha20 stream cipher
+# - High quality: Passes all statistical randomness tests
+rand_chacha = "0.3"
+
+# -----------------------------------------------------------------------------
+# Error Handling
+# -----------------------------------------------------------------------------
+# `thiserror` provides a derive macro for the std::error::Error trait.
+# Makes it easy to define custom error types with proper error messages.
+#
+# Example:
+# ```rust
+# #[derive(thiserror::Error, Debug)]
+# enum MyError {
+#     #[error("Invalid value: {0}")]
+#     InvalidValue(String),
+# }
+# ```
+thiserror = "1.0"
+
+# `anyhow` provides a flexible error type for application code.
+# - `anyhow::Result<T>` = `Result<T, anyhow::Error>`
+# - `anyhow::Error` can hold any error type
+# - Good for main() and application-level errors where you don't need
+#   to match on specific error types
+anyhow = "1.0"
+
+# rusqlite - SQLite bindings for Rust
+# `bundled` compiles SQLite from source so no system library is needed.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# =============================================================================
+# Development Dependencies
+# =============================================================================
+#
+# These are only compiled for tests, examples, and benchmarks.
+# Not included in the final release binary.
+
+[dev-dependencies]
+# -----------------------------------------------------------------------------
+# Mockall - Mocking Framework
+# -----------------------------------------------------------------------------
+# Mockall generates mock implementations of traits for testing.
+# Allows us to test game logic without a real terminal.
+#
+# Usage:
+# ```rust
+# #[cfg_attr(test, mockall::automock)]
+# pub trait Renderer { ... }
+#
+# // In tests:
+# let mut mock = MockRenderer::new();
+# mock.expect_render().returning(|_| Ok(()));
+# ```
+mockall = "0.13"
+
+# -----------------------------------------------------------------------------
+# Proptest - Property-Based Testing
+# -----------------------------------------------------------------------------
+# Property-based testing generates random inputs to test invariants.
+# Instead of writing specific test cases, we define properties that
+# should always hold, and proptest tries to find counterexamples.
+#
+# Example: "Generated puzzles always have exactly one solution"
+proptest = "1.5"
+
+# =============================================================================
+# Profile Configuration
+# =============================================================================
+#
+# RUST CONCEPT: Build Profiles
+# ----------------------------
+# Cargo has built-in profiles that control compilation:
+# - dev: `cargo build` - fast compilation, debug info, no optimization
+# - release: `cargo build --release` - slow compilation, full optimization
+# - test: `cargo test` - like dev but for tests
+# - bench: `cargo bench` - like release but for benchmarks
+#
+# We can customize these profiles:
+
+[profile.dev]
+# Optimize dependencies even in dev mode for faster runtime
+# (puzzle generation can be slow without optimization)
+opt-level = 1
+
+[profile.release]
+# Enable Link-Time Optimization for smaller, faster binary
+# This re-optimizes across crate boundaries at link time
+lto = true
+
+# Strip symbols from release binary (smaller size)
+strip = true
+
+# =============================================================================
+# Binary Configuration
+# =============================================================================
+
+[[bin]]
+name = "slitherlink"
+path = "src/main.rs"
+
+[[bin]]
+name = "puzzle_collector"
+path = "src/bin/puzzle_collector.rs"
+
+# Also expose as a library for testing
+[lib]
+name = "slitherlink"
+path = "src/lib.rs"
