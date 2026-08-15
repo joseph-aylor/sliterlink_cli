@@ -20,6 +20,8 @@
 //! | Move        | Arrow keys, h/j/k/l (vim)      |
 //! | Draw Line   | Ctrl + direction               |
 //! | Draw Cross  | Shift + direction              |
+//! | Undo        | Ctrl+Z                         |
+//! | Redo        | Ctrl+R, Ctrl+Shift+Z           |
 //! | Quit        | q                              |
 //! | Confirm     | y (in dialogs)                 |
 //! | Cancel      | n, Escape (in dialogs)         |
@@ -110,6 +112,19 @@ pub enum GameInput {
     ///
     /// Triggered by pressing 'n' or Escape during QuitConfirmation phase.
     Cancel,
+
+    /// Undo the most recent edit (draw line / draw cross).
+    ///
+    /// Triggered by Ctrl+Z. Restores the edge markings and cursor position
+    /// from before the last edit. Cursor-only movement is not part of the
+    /// undo history.
+    Undo,
+
+    /// Redo the most recently undone edit.
+    ///
+    /// Triggered by Ctrl+R or Ctrl+Shift+Z. Cleared whenever a new edit is
+    /// made after undoing.
+    Redo,
 }
 
 impl GameInput {
@@ -181,6 +196,8 @@ impl GameInput {
             GameInput::Quit => "Quit".to_string(),
             GameInput::Confirm => "Confirm".to_string(),
             GameInput::Cancel => "Cancel".to_string(),
+            GameInput::Undo => "Undo".to_string(),
+            GameInput::Redo => "Redo".to_string(),
         }
     }
 }

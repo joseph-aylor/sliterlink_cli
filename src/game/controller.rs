@@ -256,17 +256,32 @@ where
             }
 
             GameInput::DrawLine(direction) => {
+                // Only take a history snapshot when we're actually going to
+                // change something — otherwise the user would get no-op undo
+                // steps when they press Ctrl+dir into a boundary.
                 if let Some(edge) = self.state.cursor_edge(direction) {
+                    self.state.save_history();
                     self.state.toggle_line(edge);
+                    self.state.move_cursor(direction);
                 }
-                self.state.move_cursor(direction);
             }
 
             GameInput::DrawCross(direction) => {
                 if let Some(edge) = self.state.cursor_edge(direction) {
+                    self.state.save_history();
                     self.state.toggle_cross(edge);
+                    self.state.move_cursor(direction);
                 }
-                self.state.move_cursor(direction);
+            }
+
+            GameInput::Undo => {
+                // Return value ignored: undo at the bottom of the stack is
+                // a harmless no-op.
+                self.state.undo();
+            }
+
+            GameInput::Redo => {
+                self.state.redo();
             }
 
             GameInput::Quit => {
@@ -448,6 +463,58 @@ mod tests {
         let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
         assert_eq!(controller.state().edge_state(edge), EdgeState::Cross);
         assert_eq!(controller.state().cursor(), Vertex::new(1, 0));
+    }
+
+    #[test]
+    fn test_undo_reverts_draw_line() {
+        let puzzle = Puzzle::empty(3, 3);
+        let state = GameState::new(puzzle);
+        let renderer = HeadlessRenderer::new();
+        let input = ScriptedInputHandler::new();
+
+        let mut controller = GameController::new(state, renderer, input);
+
+        controller.handle_input(GameInput::DrawLine(Direction::Right));
+        let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
+        assert_eq!(controller.state().edge_state(edge), EdgeState::Line);
+        assert_eq!(controller.state().cursor(), Vertex::new(1, 0));
+
+        controller.handle_input(GameInput::Undo);
+        assert_eq!(controller.state().edge_state(edge), EdgeState::Unknown);
+        assert_eq!(controller.state().cursor(), Vertex::new(0, 0));
+
+        controller.handle_input(GameInput::Redo);
+        assert_eq!(controller.state().edge_state(edge), EdgeState::Line);
+        assert_eq!(controller.state().cursor(), Vertex::new(1, 0));
+    }
+
+    #[test]
+    fn test_undo_with_no_history_is_noop() {
+        let puzzle = Puzzle::empty(3, 3);
+        let state = GameState::new(puzzle);
+        let renderer = HeadlessRenderer::new();
+        let input = ScriptedInputHandler::new();
+
+        let mut controller = GameController::new(state, renderer, input);
+
+        // Should not panic and should leave state alone.
+        controller.handle_input(GameInput::Undo);
+        controller.handle_input(GameInput::Redo);
+        assert_eq!(controller.state().cursor(), Vertex::new(0, 0));
+    }
+
+    #[test]
+    fn test_draw_at_boundary_does_not_add_history() {
+        let puzzle = Puzzle::empty(3, 3);
+        let state = GameState::new(puzzle);
+        let renderer = HeadlessRenderer::new();
+        let input = ScriptedInputHandler::new();
+
+        let mut controller = GameController::new(state, renderer, input);
+
+        // At (0, 0), Left is off the board — no edge, no snapshot.
+        controller.handle_input(GameInput::DrawLine(Direction::Left));
+        assert!(!controller.state().can_undo());
     }
 
     #[test]

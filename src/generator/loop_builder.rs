@@ -165,7 +165,16 @@ impl LoopBuilder {
         initial.shuffle(rng);
         untried_moves.push(initial);
 
+        let num_vertices = (self.width + 1) * (self.height + 1);
+        let max_steps = num_vertices * num_vertices * 4;
+        let mut steps = 0usize;
+
         loop {
+            steps += 1;
+            if steps > max_steps {
+                return None;
+            }
+
             // Check if we can close the loop from the current position.
             if path.len() >= self.min_path_length {
                 let all = self.get_valid_moves(current, start, &visited, &vertex_degree, path.len());
@@ -176,7 +185,7 @@ impl LoopBuilder {
             }
 
             // Safety limit.
-            if path.len() > (self.width + 1) * (self.height + 1) * 2 {
+            if path.len() > num_vertices * 2 {
                 return None;
             }
 

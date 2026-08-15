@@ -206,6 +206,12 @@ impl Renderer for TerminalRenderer {
                 Span::styled("X: ", Style::default().fg(Color::Gray)),
                 Span::styled("Shift+dir", Style::default().fg(Color::White)),
                 Span::raw(" | "),
+                Span::styled("Undo: ", Style::default().fg(Color::Gray)),
+                Span::styled("Ctrl+Z", Style::default().fg(Color::Blue)),
+                Span::raw(" | "),
+                Span::styled("Redo: ", Style::default().fg(Color::Gray)),
+                Span::styled("Ctrl+R", Style::default().fg(Color::Blue)),
+                Span::raw(" | "),
                 Span::styled("Quit: ", Style::default().fg(Color::Gray)),
                 Span::styled("q", Style::default().fg(Color::Magenta)),
             ];
