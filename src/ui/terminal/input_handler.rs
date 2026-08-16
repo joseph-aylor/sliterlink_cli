@@ -14,6 +14,9 @@
 //! | Arrow Right / l       | Move cursor right         |
 //! | Ctrl + direction      | Draw/toggle line          |
 //! | Shift + direction     | Draw/toggle cross (X)     |
+//! | Ctrl + Z              | Undo last edit            |
+//! | Ctrl + R              | Redo last undone edit     |
+//! | Ctrl + Shift + Z      | Redo (alt binding)        |
 //! | q                     | Quit (with confirmation)  |
 //!
 //! # Crossterm Events
@@ -174,6 +177,28 @@ fn translate_key(key: KeyEvent) -> Option<GameInput> {
         return Some(GameInput::Quit);
     }
 
+    // Undo / Redo.
+    //
+    // Terminals normalize Ctrl+letter to the lowercase char, so we accept
+    // both cases. Ctrl+Shift+Z is the conventional redo binding but many
+    // terminals swallow it — Ctrl+R is the reliable fallback.
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        match code {
+            KeyCode::Char('z') | KeyCode::Char('Z')
+                if modifiers.contains(KeyModifiers::SHIFT) =>
+            {
+                return Some(GameInput::Redo);
+            }
+            KeyCode::Char('z') | KeyCode::Char('Z') => {
+                return Some(GameInput::Undo);
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                return Some(GameInput::Redo);
+            }
+            _ => {}
+        }
+    }
+
     // Check for direction-based inputs
     if let Some(direction) = key_to_direction(code) {
         // Ctrl + direction = draw line
@@ -327,6 +352,34 @@ mod tests {
 
         let esc = make_key(KeyCode::Esc, KeyModifiers::NONE);
         assert_eq!(translate_key(esc), Some(GameInput::Cancel));
+    }
+
+    #[test]
+    fn test_ctrl_z_undo() {
+        let ctrl_z = make_key(KeyCode::Char('z'), KeyModifiers::CONTROL);
+        assert_eq!(translate_key(ctrl_z), Some(GameInput::Undo));
+    }
+
+    #[test]
+    fn test_ctrl_r_redo() {
+        let ctrl_r = make_key(KeyCode::Char('r'), KeyModifiers::CONTROL);
+        assert_eq!(translate_key(ctrl_r), Some(GameInput::Redo));
+    }
+
+    #[test]
+    fn test_ctrl_shift_z_redo() {
+        let ctrl_shift_z = make_key(
+            KeyCode::Char('z'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        );
+        assert_eq!(translate_key(ctrl_shift_z), Some(GameInput::Redo));
+
+        // Terminals may deliver the uppercase form for Ctrl+Shift+Z.
+        let ctrl_shift_z_upper = make_key(
+            KeyCode::Char('Z'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        );
+        assert_eq!(translate_key(ctrl_shift_z_upper), Some(GameInput::Redo));
     }
 
     #[test]

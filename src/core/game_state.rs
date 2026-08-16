@@ -168,6 +168,28 @@ pub struct GameState {
 
     /// Current game phase.
     phase: GamePhase,
+
+    /// Snapshots of state prior to each edit, ordered oldest→newest.
+    ///
+    /// A snapshot is captured via `save_history` immediately before an edit.
+    /// `undo` pops from here and pushes the current state onto `redo_stack`.
+    undo_stack: Vec<HistorySnapshot>,
+
+    /// Snapshots produced by `undo`, available to `redo`.
+    ///
+    /// Cleared whenever a fresh edit is made (via `save_history`) — the
+    /// standard behavior for a linear undo/redo history.
+    redo_stack: Vec<HistorySnapshot>,
+}
+
+/// A snapshot of the mutable, undo-able parts of a game state.
+///
+/// Cursor position is included so undo/redo restores the pre-edit cursor,
+/// matching what most editors do.
+#[derive(Debug, Clone)]
+struct HistorySnapshot {
+    edges: HashMap<Edge, EdgeState>,
+    cursor: Vertex,
 }
 
 impl GameState {
@@ -196,6 +218,8 @@ impl GameState {
             edges: HashMap::new(),
             cursor: Vertex::new(0, 0),
             phase: GamePhase::Playing,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 
@@ -218,6 +242,8 @@ impl GameState {
             edges: HashMap::new(),
             cursor,
             phase: GamePhase::Playing,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 
@@ -527,18 +553,95 @@ impl GameState {
 
     /// Clears all edge markings, returning to initial state.
     ///
-    /// Does not change cursor position or game phase.
+    /// Does not change cursor position or game phase. Also clears undo/redo
+    /// history — a full wipe is not something we want the player to undo
+    /// piecewise.
     pub fn clear_edges(&mut self) {
         self.edges.clear();
+        self.undo_stack.clear();
+        self.redo_stack.clear();
     }
 
     /// Resets the game to initial state.
     ///
-    /// Clears all edges, resets cursor to (0, 0), and sets phase to Playing.
+    /// Clears all edges, resets cursor to (0, 0), sets phase to Playing,
+    /// and empties the undo/redo history.
     pub fn reset(&mut self) {
         self.edges.clear();
         self.cursor = Vertex::new(0, 0);
         self.phase = GamePhase::Playing;
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+
+    // -------------------------------------------------------------------------
+    // Undo / Redo
+    // -------------------------------------------------------------------------
+
+    /// Captures the current state before an edit, enabling `undo`.
+    ///
+    /// The caller (typically the game controller) is expected to invoke this
+    /// immediately before mutating the edge map or cursor as part of a user
+    /// edit. Any pending redo history is discarded — a new edit branches the
+    /// timeline.
+    ///
+    /// This is a no-op-safe operation, but avoid calling it for actions that
+    /// don't actually change state; otherwise the user gets no-op undo steps.
+    pub fn save_history(&mut self) {
+        self.undo_stack.push(HistorySnapshot {
+            edges: self.edges.clone(),
+            cursor: self.cursor,
+        });
+        self.redo_stack.clear();
+    }
+
+    /// Reverts to the most recently saved snapshot.
+    ///
+    /// Returns `true` if a snapshot was applied, `false` if the undo stack
+    /// was empty. The state currently displayed is pushed onto the redo
+    /// stack so `redo` can walk forward again.
+    pub fn undo(&mut self) -> bool {
+        if let Some(snapshot) = self.undo_stack.pop() {
+            self.redo_stack.push(HistorySnapshot {
+                edges: std::mem::take(&mut self.edges),
+                cursor: self.cursor,
+            });
+            self.edges = snapshot.edges;
+            self.cursor = snapshot.cursor;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Re-applies the most recently undone edit.
+    ///
+    /// Returns `true` if a snapshot was applied. Only valid after `undo`;
+    /// the redo stack is cleared whenever a fresh edit is saved.
+    pub fn redo(&mut self) -> bool {
+        if let Some(snapshot) = self.redo_stack.pop() {
+            self.undo_stack.push(HistorySnapshot {
+                edges: std::mem::take(&mut self.edges),
+                cursor: self.cursor,
+            });
+            self.edges = snapshot.edges;
+            self.cursor = snapshot.cursor;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if there is at least one edit that can be undone.
+    #[inline]
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Returns true if there is at least one edit that can be redone.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
     }
 
     /// Returns the number of edges adjacent to a vertex that are marked as Lines.
@@ -842,6 +945,81 @@ mod tests {
         state.set_edge_state(right, EdgeState::Line);
 
         assert_eq!(state.cell_line_count(cell), 2);
+    }
+
+    #[test]
+    fn test_undo_restores_previous_edges_and_cursor() {
+        let mut state = GameState::new(make_puzzle());
+        let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
+
+        // Pretend the controller does: snapshot, then edit + cursor move.
+        state.save_history();
+        state.set_edge_state(edge, EdgeState::Line);
+        state.set_cursor(Vertex::new(1, 0));
+
+        assert!(state.can_undo());
+        assert!(!state.can_redo());
+
+        assert!(state.undo());
+        assert_eq!(state.edge_state(edge), EdgeState::Unknown);
+        assert_eq!(state.cursor(), Vertex::new(0, 0));
+        assert!(!state.can_undo());
+        assert!(state.can_redo());
+    }
+
+    #[test]
+    fn test_redo_reapplies_undone_edit() {
+        let mut state = GameState::new(make_puzzle());
+        let edge = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
+
+        state.save_history();
+        state.set_edge_state(edge, EdgeState::Line);
+        state.set_cursor(Vertex::new(1, 0));
+
+        state.undo();
+        assert!(state.redo());
+        assert_eq!(state.edge_state(edge), EdgeState::Line);
+        assert_eq!(state.cursor(), Vertex::new(1, 0));
+        assert!(state.can_undo());
+        assert!(!state.can_redo());
+    }
+
+    #[test]
+    fn test_save_history_clears_redo_stack() {
+        let mut state = GameState::new(make_puzzle());
+        let edge_a = Edge::new(Vertex::new(0, 0), Vertex::new(1, 0));
+        let edge_b = Edge::new(Vertex::new(0, 0), Vertex::new(0, 1));
+
+        state.save_history();
+        state.set_edge_state(edge_a, EdgeState::Line);
+        state.undo();
+        assert!(state.can_redo());
+
+        // A new edit branches the history — redo is no longer valid.
+        state.save_history();
+        state.set_edge_state(edge_b, EdgeState::Cross);
+        assert!(!state.can_redo());
+        assert!(state.can_undo());
+    }
+
+    #[test]
+    fn test_undo_on_empty_stack_is_noop() {
+        let mut state = GameState::new(make_puzzle());
+        assert!(!state.undo());
+        assert!(!state.redo());
+    }
+
+    #[test]
+    fn test_reset_clears_history() {
+        let mut state = GameState::new(make_puzzle());
+        state.save_history();
+        state.set_edge_state(
+            Edge::new(Vertex::new(0, 0), Vertex::new(1, 0)),
+            EdgeState::Line,
+        );
+        state.reset();
+        assert!(!state.can_undo());
+        assert!(!state.can_redo());
     }
 
     #[test]
